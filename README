@@ -1,0 +1,50 @@
+GETTING STARTED
+===============
+
+Cloning
+-------
+
+This repository contains a submodule.
+To clone this repository, first clone it as usual, then cd into
+the cloned repository and execute the last two submodule more commands:
+
+$ git clone https://github.com/AlericInglewood/3p-libcurl.git 3p-libcurl
+$ cd 3p-libcurl
+$ git submodule init
+$ git submodule update
+
+Continue at BUILDING below, unless you actually need
+to upgrade the curl version (you'll need repository
+write access for that though).
+
+Updating curl-git
+--------------------
+
+To update the submodule, simply cd into curl-git and
+treat it as a normal git repository.
+
+$ cd curl-git
+$ git reset --hard		# Throw away all local changes!
+$ git checkout curl-7_39_0_pipelinefix
+$ git pull
+
+Register in the superproject that a different checkout is being used:
+Don't forget the update the version in autobuild.xml too!
+
+$ cd ..
+$ vi autobuild.xml
+$ git commit -am 'Updated submodule curl-git to latest curl-7_39_0_pipelinefix'
+
+
+BUILDING
+========
+
+# To build the package:
+cd 3p-libcurl
+autobuild install	# Install zlib and openssl
+autobuild build
+autobuild package
+
+The produced package is directly usable for Singularity and
+does not need conversion.
+

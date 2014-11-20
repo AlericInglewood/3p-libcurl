@@ -283,7 +283,7 @@
       <key>source_type</key>
       <string>hg</string>
       <key>version</key>
-      <string>7.39.0-pipeline-fixes</string>
+      <string>curl-pipeline-e4b691e8</string>
     </map>
     <key>type</key>
     <string>autobuild</string>
