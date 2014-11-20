@@ -1,0 +1,18 @@
+# BuildParams
+#
+# Please refer to:
+#  https://wiki.secondlife.com/wiki/Automated_Build_System
+
+# Use Public Upload Locations
+public_build = true
+
+# Set to true to package files in legacy build layout.
+# see https://wiki.lindenlab.com/wiki/Autobuild/Package_Layout
+curl-autobuild.build_legacy_package = false
+
+curl-autobuild.PACKAGE_NAME = curl
+
+# autobuild uses VS2010
+AUTOBUILD_VSVER=100
+
+# eof
