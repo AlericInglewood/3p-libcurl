@@ -244,9 +244,9 @@ pushd "$CURL_SOURCE_DIR"
             #
             # sdk=/Developer/SDKs/MacOSX10.6.sdk/
             # sdk=/Developer/SDKs/MacOSX10.7.sdk/
-            # sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk/
-            sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/
-            opts="--arch i386 -iwithsysroot $sdk -mmacosx-version-min=10.6 -gdwarf-2"
+            sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk/
+            # sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/
+            opts="-arch i386 -iwithsysroot $sdk -mmacosx-version-min=10.6 -gdwarf-2"
 
             rm -rf Resources/ ../Resources tests/Resources/
 
