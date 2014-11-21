@@ -18,9 +18,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1acdf58efa7a728fd390a710c659ec65</string>
+              <string>0ce065af8e26c0b1811c71af2f5f9b80</string>
               <key>url</key>
-              <string>https://bitbucket.org/SingularityViewer/libraries/downloads/openssl-1.0.0g-darwin-20120712.tar.bz2</string>
+              <string>https://bitbucket.org/SingularityViewer/libraries/downloads/openssl-1.0.1j-darwin-20141119.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin</string>
