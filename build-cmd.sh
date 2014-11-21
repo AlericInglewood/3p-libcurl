@@ -1,50 +1,99 @@
 #!/bin/bash
 
-cd "$(dirname "$0")"
+cd "`dirname "$0"`"
+top="`pwd`"
+stage="$top/stage"
 
 # turn on verbose debugging output for parabuild logs.
 set -x
 # make errors fatal
 set -e
 
+CURL_SOURCE_DIR="curl-git"
+
 if [ -z "$AUTOBUILD" ] ; then 
     fail
 fi
 
 if [ "$OSTYPE" = "cygwin" ] ; then
-    export AUTOBUILD="$(cygpath -u $AUTOBUILD)"
+    export AUTOBUILD="`cygpath -u "$AUTOBUILD"`"
 fi
 
-CURL_VERSION=7.38.0
-CURL_SOURCE_DIR="curl"
-
 # load autbuild provided shell functions and variables
+set +x
 eval "$("$AUTOBUILD" source_environment)"
+set -x
 
-top="$(pwd)"
-stage="$(pwd)/stage"
+opts=
+case $AUTOBUILD_PLATFORM in
+  windows)
+    host="i686-win32"
+  ;;
+  windows64)
+    host="x86_64-win"
+  ;;
+  darwin)
+    host="universal-darwin"
+  ;;
+  linux)
+    host="i686-linux"
+    opts="-m32"
+  ;;
+  linux64)
+    host="x86_64-linux"
+    opts="-m64"
+  ;;
+esac
 
-ZLIB_INCLUDE="${stage}"/packages/include/zlib
-OPENSSL_INCLUDE="${stage}"/packages/include/openssl
+[ -n "$host" ] || fail "Unknown platform $AUTOBUILD_PLATFORM."
+
+ZLIB_INCLUDE="${stage}"/packages/libraries/$host/include/zlib
+OPENSSL_INCLUDE="${stage}"/packages/libraries/$host/include/openssl
 
 [ -f "$ZLIB_INCLUDE"/zlib.h ] || fail "You haven't installed the zlib package yet."
 [ -f "$OPENSSL_INCLUDE"/ssl.h ] || fail "You haven't installed the openssl package yet."
 
+# The packages store their content in:
+#
+# "$stage"/packages/libraries/$host/include/openssl/*.h
+# "$stage"/packages/libraries/$host/include/zlib/*.h
+#                                           ^^^^
+# "$stage"/packages/libraries/$host/lib/{debug,release}/lib*
+#                                       ^^^^^^^^^^^^^^^
+# That doesn't play nice with configure, therefore add symlinks
+# so that configure can find the object files in
+# "$stage"/packages/libraries/$host/{debug,release}/lib/lib*
+# and the header files in
+# "$stage"/packages/libraries/$host/{debug,release}/include
+
+fix_package_paths()
+{
+    pushd "$stage/packages/libraries/$host/include"
+    for zheader in zlib/*.h; do
+      ln -sf $zheader
+    done
+    popd
+    for reltype in debug release; do
+      mkdir -p "$stage"/packages/libraries/$host/$reltype
+      ln -sf "$stage"/packages/libraries/$host/lib/$reltype "$stage"/packages/libraries/$host/$reltype/lib
+      ln -sf "$stage"/packages/libraries/$host/include      "$stage"/packages/libraries/$host/$reltype/include
+    done
+}
+
 # Restore all .sos
 restore_sos ()
 {
-    for solib in "${stage}"/packages/lib/{debug,release}/lib*.so*.disable; do
+    for solib in "$stage/packages/libraries/$host/lib"/{debug,release}/lib{z,ssl,crypto}.so*.disable; do
         if [ -f "$solib" ]; then
             mv -f "$solib" "${solib%.disable}"
         fi
     done
 }
 
-
 # Restore all .dylibs
 restore_dylibs ()
 {
-    for dylib in "$stage/packages/lib"/{debug,release}/*.dylib.disable; do
+    for dylib in "$stage/packages/libraries/$host/lib"/{debug,release}/*.dylib.disable; do
         if [ -f "$dylib" ]; then
             mv "$dylib" "${dylib%.disable}"
         fi
@@ -56,27 +105,50 @@ restore_dylibs ()
 # is defeated and we're using a threaded resolver.
 check_damage ()
 {
-    case "$1" in
-        "windows")
+    case $1 in
+      windows|windows64)
             echo "Verifying Ares is disabled"
             grep 'USE_ARES\s*1' lib/config-win32.h | grep '^/\*'
         ;;
 
-        "darwin")
+      darwin|linux|linux64)
             echo "Verifying Ares is disabled"
             egrep 'USE_THREADS_POSIX[[:space:]]+1' lib/curl_config.h
-        ;;
-
-        "linux")
-            echo "Verifying Ares is disabled"
-            egrep 'USE_THREADS_POSIX[[:space:]]+1' lib/curl_config.h
+	    echo "Verifying zlib was found"
+	    egrep 'HAVE_ZLIB_H[[:space:]]+1' lib/curl_config.h
+	    echo "Verifying openssl was found"
+	    egrep 'USE_SSLEAY[[:space:]]+1' lib/curl_config.h
+	    egrep 'USE_OPENSSL[[:space:]]+1' lib/curl_config.h
+	    egrep 'HAVE_OPENSSL_ENGINE_H[[:space:]]+1' lib/curl_config.h
         ;;
     esac
 }
 
+build_unix()
+{
+    prefix="/libraries/$host"
+    reltype="$1"
+    shift
+
+    echo "LIBS = \"$LIBS\""
+    [ -f ./configure ] || ./buildconf
+    [ -d "$stage"/packages/libraries/$host/$reltype ] || fix_package_paths
+
+    CFLAGS="$opts" \
+        LIBS="$libs" \
+	./configure --disable-ldap --disable-ldaps --enable-shared=no --disable-curldebug \
+        --enable-threaded-resolver --without-libssh2 \
+	--prefix="$prefix" --libdir="$prefix/lib/$reltype" \
+	--with-zlib="$stage/packages$prefix/$reltype" --with-ssl="$stage/packages$prefix/$reltype" $*
+    check_damage "$AUTOBUILD_PLATFORM"
+    make -j 8
+    make DESTDIR="$stage" install
+    make distclean
+}
+
 pushd "$CURL_SOURCE_DIR"
-    case "$AUTOBUILD_PLATFORM" in
-        "windows")
+    case $AUTOBUILD_PLATFORM in
+        windows)
             check_damage "$AUTOBUILD_PLATFORM"
             packages="$(cygpath -m "$stage/packages")"
             load_vsvars
@@ -161,7 +233,7 @@ pushd "$CURL_SOURCE_DIR"
             popd
         ;;
 
-        "darwin")
+        darwin)
             # Select SDK with full path.  This shouldn't have much effect on this
             # build but adding to establish a consistent pattern.
             #
@@ -169,231 +241,40 @@ pushd "$CURL_SOURCE_DIR"
             # sdk=/Developer/SDKs/MacOSX10.7.sdk/
             # sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk/
             sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/
+            opts="--arch i386 -iwithsysroot $sdk -mmacosx-version-min=10.6 -gdwarf-2"
 
-            opts="${TARGET_OPTS:--arch i386 -iwithsysroot $sdk -mmacosx-version-min=10.6}"
-
-            mkdir -p "$stage/lib/release"
-            mkdir -p "$stage/lib/debug"
             rm -rf Resources/ ../Resources tests/Resources/
 
             # Force libz and openssl static linkage by moving .dylibs out of the way
             trap restore_dylibs EXIT
-            for dylib in "$stage"/packages/lib/{debug,release}/lib{z,crypto,ssl}*.dylib; do
+            for dylib in "$stage"/packages/libraries/$host/lib/{debug,release}/lib{z,crypto,ssl}*.dylib; do
                 if [ -f "$dylib" ]; then
                     mv "$dylib" "$dylib".disable
                 fi
             done
 
-            # Debug configure and build
-
-            # Make .dylib's usable during configure as well as unit tests
-            # (Used when building with dylib libz or OpenSSL.)
-            # mkdir -p Resources/
-            # ln -sf "${stage}"/packages/lib/debug/*.dylib Resources/
-            # mkdir -p ../Resources/
-            # ln -sf "${stage}"/packages/lib/debug/*.dylib ../Resources/
-            # mkdir -p tests/Resources/
-            # ln -sf "${stage}"/packages/lib/debug/*.dylib tests/Resources/
-            # LDFLAGS="-L../Resources/ -L\"$stage\"/packages/lib/debug" \
-
-            # Curl configure has trouble finding zlib 'framework' that
-            # it doesn't have with openssl.  We help it with CPPFLAGS.
-
-            # -g/-O options controled by --enable-debug/-optimize.  Unfortunately,
-            # --enable-debug also defines DEBUGBUILD which changes behaviors.
-            CFLAGS="$opts -gdwarf-2 -O0" \
-                CXXFLAGS="$opts -gdwarf-2 -O0" \
-                LDFLAGS=-L"$stage"/packages/lib/debug \
-                CPPFLAGS="$opts -I$stage/packages/include/zlib" \
-                ./configure  --disable-ldap --disable-ldaps --enable-shared=no \
-                --disable-debug --disable-curldebug --disable-optimize \
-                --prefix="$stage" --libdir="${stage}"/lib/debug --enable-threaded-resolver \
-                --with-ssl="${stage}/packages" --with-zlib="${stage}/packages" --without-libssh2
-            check_damage "$AUTOBUILD_PLATFORM"
-            make
-            make install
-
-            # conditionally run unit tests
-            # Disabled here and below by default on Mac because they
-            # trigger the Mac firewall dialog and that may make
-            # automated builds unreliable.  During development,
-            # explicitly inhibit the disable and run the tests.  They
-            # matter.
-            if [ "${DISABLE_UNIT_TESTS:-1}" = "0" ]; then
-                pushd tests
-                    # We hijack the 'quiet-test' target and redefine it as
-                    # a no-valgrind test.  Also exclude test 906.  It fails in the
-                    # 7.33 distribution with our configuration options.  530 fails
-                    # in TeamCity.  (Expect problems with the unit tests, they're
-                    # very sensitive to environment.)
-                    make quiet-test TEST_Q='-n !906 !530 !564 !584 !706 !1316'
-                popd
-            fi
-
-            make distclean 
-            # rm -rf Resources/ ../Resources tests/Resources/
-
-            # Release configure and build
-            # mkdir -p Resources/
-            # ln -sf "${stage}"/packages/lib/release/*.dylib Resources/
-            # mkdir -p ../Resources/
-            # ln -sf "${stage}"/packages/lib/release/*.dylib ../Resources/
-            # mkdir -p tests/Resources/
-            # ln -sf "${stage}"/packages/lib/release/*.dylib tests/Resources/
-
-            CFLAGS="$opts -gdwarf-2" \
-                CXXFLAGS="$opts -gdwarf-2" \
-                LDFLAGS=-L"$stage"/packages/lib/release \
-                CPPFLAGS="$opts -I$stage/packages/include/zlib" \
-                ./configure  --disable-ldap --disable-ldaps --enable-shared=no \
-                --disable-debug --disable-curldebug --enable-optimize \
-                --prefix="$stage" --libdir="${stage}"/lib/release --enable-threaded-resolver \
-                --with-ssl="${stage}/packages" --with-zlib="${stage}/packages" --without-libssh2
-            check_damage "$AUTOBUILD_PLATFORM"
-            make
-            make install
-
-            # conditionally run unit tests
-            if [ "${DISABLE_UNIT_TESTS:-1}" = "0" ]; then
-                pushd tests
-                    # We hijack the 'quiet-test' target and redefine it as
-                    # a no-valgrind test.  Also exclude test 906.  It fails in the
-                    # 7.33 distribution with our configuration options.  530 fails
-                    # in TeamCity.  (Expect problems with the unit tests, they're
-                    # very sensitive to environment.)
-                    make quiet-test TEST_Q='-n !906 !530 !564 !584 !706 !1316'
-                popd
-            fi
-
-            make distclean 
-            # Again, for dylib dependencies
-            # rm -rf Resources/ ../Resources tests/Resources/
+	    libs=
+	    build_unix release --disable-debug --enable-optimize
+	    build_unix debug --enable-debug --disable-optimize
         ;;
 
-        "linux")
-            # Linux build environment at Linden comes pre-polluted with stuff that can
-            # seriously damage 3rd-party builds.  Environmental garbage you can expect
-            # includes:
-            #
-            #    DISTCC_POTENTIAL_HOSTS     arch           root        CXXFLAGS
-            #    DISTCC_LOCATION            top            branch      CC
-            #    DISTCC_HOSTS               build_name     suffix      CXX
-            #    LSDISTCC_ARGS              repo           prefix      CFLAGS
-            #    cxx_version                AUTOBUILD      SIGN        CPPFLAGS
-            #
-            # So, clear out bits that shouldn't affect our configure-directed build
-            # but which do nonetheless.
-            #
-            # unset DISTCC_HOSTS CC CXX CFLAGS CPPFLAGS CXXFLAGS
-
-            # Prefer gcc-4.6 if available.
-            #if [[ -x /usr/bin/gcc-4.6 && -x /usr/bin/g++-4.6 ]]; then
-            #    export CC=/usr/bin/gcc-4.6
-            #    export CXX=/usr/bin/g++-4.6
-            #fi
-
-            # Default target to 32-bit
-            opts="${TARGET_OPTS:--m32}"
-
-            # Handle any deliberate platform targeting
-            if [ -z "$TARGET_CPPFLAGS" ]; then
-                # Remove sysroot contamination from build environment
-                unset CPPFLAGS
-            else
-                # Incorporate special pre-processing flags
-                export CPPFLAGS="$TARGET_CPPFLAGS" 
-            fi
-
+        linux|linux64)
             # Force static linkage to libz and openssl by moving .sos out of the way
             trap restore_sos EXIT
-            for solib in "${stage}"/packages/lib/{debug,release}/lib{z,ssl,crypto}.so*; do
+            for solib in "${stage}"/packages/libraries/$host/lib/{debug,release}/lib{z,ssl,crypto}.so*; do
                 if [ -f "$solib" ]; then
                     mv -f "$solib" "$solib".disable
                 fi
             done
-            
-            mkdir -p "$stage/lib/release"
-            mkdir -p "$stage/lib/debug"
 
-            # Autoconf's configure will do some odd things to flags.  '-I' options
-            # will get transferred to '-isystem' and there's a problem with quoting.
-            # Linking and running also require LD_LIBRARY_PATH to locate the OpenSSL
-            # .so's.  The '--with-ssl' option could do this if we had a more normal
-            # package layout.
-            #
-            # configure-time compilation looks like:
-            # ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-            # ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-            saved_path="$LD_LIBRARY_PATH"
-
-            # Debug configure and build
-            export LD_LIBRARY_PATH="${stage}"/packages/lib/debug:"$saved_path"
-
-            # -g/-O options controled by --enable-debug/-optimize.  Unfortunately,
-            # --enable-debug also defines DEBUGBUILD which changes behaviors.
-            CFLAGS="-g $opts" \
-                CXXFLAGS="-g $opts" \
-                CPPFLAGS="${CPPFLAGS} $opts -I$stage/packages/include/zlib" \
-                LIBS="-ldl" \
-                LDFLAGS="-L$stage/packages/lib/debug/" \
-                ./configure --disable-ldap --disable-ldaps --enable-shared=no --enable-threaded-resolver \
-                --enable-debug --disable-curldebug --disable-optimize \
-                --prefix="$stage" --libdir="$stage"/lib/debug \
-                --with-ssl="$stage"/packages/ --with-zlib="$stage"/packages/ --without-libssh2
-            check_damage "$AUTOBUILD_PLATFORM"
-            make -j 8
-            make install
-
-            # conditionally run unit tests
-            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                pushd tests
-                    # We hijack the 'quiet-test' target and redefine it as
-                    # a no-valgrind test.  Also exclude test 906.  It fails in the
-                    # 7.33 distribution with our configuration options.  530 fails
-                    # in TeamCity.  815 hangs in 7.36.0 fixed in 7.37.0.
-                    #
-                    # Expect problems with the unit tests, they're very sensitive
-                    # to environment.
-                    make quiet-test TEST_Q='-n !906 !530 !564 !584'
-                popd
-            fi
-
-            make distclean 
-
-            # Release configure and build
-            export LD_LIBRARY_PATH="${stage}"/packages/lib/release:"$saved_path"
-
-            CFLAGS="$opts" \
-                CXXFLAGS="$opts"  \
-                CPPFLAGS="${CPPFLAGS} $opts -I$stage/packages/include/zlib" \
-                LIBS="-ldl" \
-                LDFLAGS="-L$stage/packages/lib/release" \
-                ./configure --disable-ldap --disable-ldaps --enable-shared=no --enable-threaded-resolver \
-                --disable-debug --disable-curldebug --enable-optimize \
-                --prefix="$stage" --libdir="$stage"/lib/release \
-                --with-ssl="$stage"/packages --with-zlib="$stage"/packages --without-libssh2
-            check_damage "$AUTOBUILD_PLATFORM"
-            make -j 8
-            make install
-
-            # conditionally run unit tests
-            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                pushd tests
-                    # We hijack the 'quiet-test' target and redefine it as
-                    # a no-valgrind test.  Also exclude test 906.  It fails in the
-                    # 7.33 distribution with our configuration options.  530 fails
-                    # in TeamCity.  815 hangs in 7.36.0 fixed in 7.37.0.
-                    #
-                    # Expect problems with the unit tests, they're very sensitive
-                    # to environment.
-                    make quiet-test TEST_Q='-n !906 !530 !564 !584'
-                popd
-            fi
-
-            make distclean 
-
-            export LD_LIBRARY_PATH="$saved_path"
+	    libs="-ldl"
+	    build_unix release --disable-debug --enable-optimize
+	    build_unix debug --enable-debug --disable-optimize
         ;;
+
+        *)
+	  fail "Unknown platform $AUTOBUILD_PLATFORM."
+	;;
     esac
     mkdir -p "$stage/LICENSES"
     cp COPYING "$stage/LICENSES/curl.txt"

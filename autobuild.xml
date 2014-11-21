@@ -192,7 +192,6 @@
           <key>manifest</key>
           <array>
             <string>LICENSES/curl.txt</string>
-            <string>include/curl/*.h</string>
           </array>
           <key>name</key>
           <string>common</string>
@@ -211,8 +210,9 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/release/libcurl.a</string>
-            <string>lib/debug/libcurl.a</string>
+	    <string>libraries/universal-darwin/include/curl/*.h</string>
+	    <string>libraries/universal-darwin/lib/release/libcurl.a</string>
+	    <string>libraries/universal-darwin/lib/debug/libcurl.a</string>
           </array>
           <key>name</key>
           <string>darwin</string>
@@ -231,8 +231,9 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/release/libcurl.a</string>
-            <string>lib/debug/libcurl.a</string>
+	    <string>libraries/i686-linux/include/curl/*.h</string>
+	    <string>libraries/i686-linux/lib/release/libcurl.a</string>
+	    <string>libraries/i686-linux/lib/debug/libcurl.a</string>
           </array>
           <key>name</key>
           <string>linux</string>
@@ -251,8 +252,9 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/release/libcurl.a</string>
-            <string>lib/debug/libcurl.a</string>
+	    <string>libraries/x86_64-linux/include/curl/*.h</string>
+	    <string>libraries/x86_64-linux/lib/release/libcurl.a</string>
+	    <string>libraries/x86_64-linux/lib/debug/libcurl.a</string>
           </array>
           <key>name</key>
           <string>linux64</string>
@@ -271,11 +273,33 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/libcurld.lib</string>
-            <string>lib/release/libcurl.lib</string>
+	    <string>libraries/i686-win32/include/curl/*.h</string>
+	    <string>libraries/i686-win32/lib/release/libcurl.lib</string>
+	    <string>libraries/i686-win32/lib/debug/libcurld.lib</string>
           </array>
           <key>name</key>
           <string>windows</string>
+        </map>
+        <key>windows64</key>
+        <map>
+          <key>configurations</key>
+          <map>
+            <key>default</key>
+            <map>
+              <key>default</key>
+              <boolean>true</boolean>
+              <key>name</key>
+              <string>default</string>
+            </map>
+          </map>
+          <key>manifest</key>
+          <array>
+	    <string>libraries/x86_64-win/include/curl/*.h</string>
+	    <string>libraries/x86_64-win/lib/release/libcurl.lib</string>
+	    <string>libraries/x86_64-win/lib/debug/libcurld.lib</string>
+          </array>
+          <key>name</key>
+          <string>windows64</string>
         </map>
       </map>
       <key>source_directory</key>
@@ -283,7 +307,7 @@
       <key>source_type</key>
       <string>hg</string>
       <key>version</key>
-      <string>curl-pipeline-e4b691e8</string>
+      <string>pipelinefix-e4b691e8</string>
     </map>
     <key>type</key>
     <string>autobuild</string>
