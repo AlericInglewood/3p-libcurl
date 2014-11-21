@@ -136,13 +136,18 @@ build_unix()
 
     CFLAGS="$opts" \
         LIBS="$libs" \
-	./configure --disable-ldap --disable-ldaps --enable-shared=no --disable-curldebug \
+	./configure --disable-ldap --disable-ldaps --disable-curldebug \
         --enable-threaded-resolver --without-libssh2 \
 	--prefix="$prefix" --libdir="$prefix/lib/$reltype" \
 	--with-zlib="$stage/packages$prefix/$reltype" --with-ssl="$stage/packages$prefix/$reltype" $*
     check_damage "$AUTOBUILD_PLATFORM"
+    pushd lib
     make -j 8
     make DESTDIR="$stage" install
+    popd
+    pushd include
+    make DESTDIR="$stage" install
+    popd
     make distclean
 }
 
@@ -254,11 +259,12 @@ pushd "$CURL_SOURCE_DIR"
             done
 
 	    libs=
-	    build_unix release --disable-debug --enable-optimize
-	    build_unix debug --enable-debug --disable-optimize
+	    build_unix release --disable-debug --enable-optimize --enable-shared=no
+	    build_unix debug --enable-debug --disable-optimize --enable-shared=no
         ;;
 
-        linux|linux64)
+        linux)
+	    # the 32bit zlib package is unfortunately static.
             # Force static linkage to libz and openssl by moving .sos out of the way
             trap restore_sos EXIT
             for solib in "${stage}"/packages/libraries/$host/lib/{debug,release}/lib{z,ssl,crypto}.so*; do
@@ -268,8 +274,14 @@ pushd "$CURL_SOURCE_DIR"
             done
 
 	    libs="-ldl"
-	    build_unix release --disable-debug --enable-optimize
-	    build_unix debug --enable-debug --disable-optimize
+	    build_unix release --disable-debug --enable-optimize --enable-shared=no
+	    build_unix debug --enable-debug --disable-optimize --enable-shared=no
+        ;;
+
+        linux64)
+	    libs="-ldl"
+	    build_unix release --disable-debug --enable-optimize --enable-static=no
+	    build_unix debug --enable-debug --disable-optimize --enable-static=no
         ;;
 
         *)
