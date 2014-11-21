@@ -75,7 +75,7 @@ fix_package_paths()
     popd
     for reltype in debug release; do
       mkdir -p "$stage"/packages/libraries/$host/$reltype
-      ln -sf "$stage"/packages/libraries/$host/lib/$reltype "$stage"/packages/libraries/$host/$reltype/lib
+      ln -sf "$stage"/packages/libraries/$host/lib/release "$stage"/packages/libraries/$host/$reltype/lib
       ln -sf "$stage"/packages/libraries/$host/include      "$stage"/packages/libraries/$host/$reltype/include
     done
 }
