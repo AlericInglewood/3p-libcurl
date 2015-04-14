@@ -29,7 +29,7 @@ $ git checkout curl-7_39_0_pipelinefix
 $ git pull
 
 Register in the superproject that a different checkout is being used:
-Don't forget the update the version in autobuild.xml too!
+Don't forget to update the version in autobuild.xml too!
 
 $ cd ..
 $ vi autobuild.xml

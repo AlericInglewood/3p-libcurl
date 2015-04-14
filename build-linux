@@ -2,7 +2,7 @@
 
 source ../../env.source
 set -e
-AUTOBUILD_PLATFORM_OVERRIDE=linux
+export AUTOBUILD_PLATFORM_OVERRIDE=linux
 rm -rf stage
 autobuild install
 autobuild build
