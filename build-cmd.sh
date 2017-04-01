@@ -47,43 +47,43 @@ esac
 
 [ -n "$host" ] || fail "Unknown platform $AUTOBUILD_PLATFORM."
 
-ZLIB_INCLUDE="${stage}"/packages/libraries/$host/include/zlib
-OPENSSL_INCLUDE="${stage}"/packages/libraries/$host/include/openssl
+ZLIB_INCLUDE="${stage}"/packages/include/zlib
+OPENSSL_INCLUDE="${stage}"/packages/include/openssl
 
 [ -f "$ZLIB_INCLUDE"/zlib.h ] || fail "You haven't installed the zlib package yet."
 [ -f "$OPENSSL_INCLUDE"/ssl.h ] || fail "You haven't installed the openssl package yet."
 
 # The packages store their content in:
 #
-# "$stage"/packages/libraries/$host/include/openssl/*.h
-# "$stage"/packages/libraries/$host/include/zlib/*.h
-#                                           ^^^^
-# "$stage"/packages/libraries/$host/lib/{debug,release}/lib*
-#                                       ^^^^^^^^^^^^^^^
+# "$stage"/packages/include/openssl/*.h
+# "$stage"/packages/include/zlib/*.h
+#                           ^^^^
+# "$stage"/packages/lib/{debug,release}/lib*
+#                       ^^^^^^^^^^^^^^^
 # That doesn't play nice with configure, therefore add symlinks
 # so that configure can find the object files in
-# "$stage"/packages/libraries/$host/{debug,release}/lib/lib*
+# "$stage"/packages/{debug,release}/lib/lib*
 # and the header files in
-# "$stage"/packages/libraries/$host/{debug,release}/include
+# "$stage"/packages/{debug,release}/include
 
 fix_package_paths()
 {
-    pushd "$stage/packages/libraries/$host/include"
+    pushd "$stage/packages/include"
     for zheader in zlib/*.h; do
       ln -sf $zheader
     done
     popd
     for reltype in debug release; do
-      mkdir -p "$stage"/packages/libraries/$host/$reltype
-      ln -sf "$stage"/packages/libraries/$host/lib/release "$stage"/packages/libraries/$host/$reltype/lib
-      ln -sf "$stage"/packages/libraries/$host/include      "$stage"/packages/libraries/$host/$reltype/include
+      mkdir -p "$stage"/packages/$reltype
+      ln -sf "$stage"/packages/lib/release "$stage"/packages/$reltype/lib
+      ln -sf "$stage"/packages/include      "$stage"/packages/$reltype/include
     done
 }
 
 # Restore all .sos
 restore_sos ()
 {
-    for solib in "$stage/packages/libraries/$host/lib"/{debug,release}/lib{z,ssl,crypto}.so*.disable; do
+    for solib in "$stage/packages/lib"/{debug,release}/lib{z,ssl,crypto}.so*.disable; do
         if [ -f "$solib" ]; then
             mv -f "$solib" "${solib%.disable}"
         fi
@@ -93,7 +93,7 @@ restore_sos ()
 # Restore all .dylibs
 restore_dylibs ()
 {
-    for dylib in "$stage/packages/libraries/$host/lib"/{debug,release}/*.dylib.disable; do
+    for dylib in "$stage/packages/lib"/{debug,release}/*.dylib.disable; do
         if [ -f "$dylib" ]; then
             mv "$dylib" "${dylib%.disable}"
         fi
@@ -126,20 +126,20 @@ check_damage ()
 
 build_unix()
 {
-    prefix="/libraries/$host"
+    prefix="/"
     reltype="$1"
     shift
 
     echo "LIBS = \"$LIBS\""
     [ -f ./configure ] || ./buildconf
-    [ -d "$stage"/packages/libraries/$host/$reltype ] || fix_package_paths
+    [ -d "$stage"/packages/$reltype ] || fix_package_paths
 
     CFLAGS="$opts" \
         LIBS="$libs" \
 	./configure --disable-ldap --disable-ldaps --disable-curldebug \
         --enable-threaded-resolver --without-libssh2 \
-	--prefix="$prefix" --libdir="$prefix/lib/$reltype" \
-	--with-zlib="$stage/packages$prefix/$reltype" --with-ssl="$stage/packages$prefix/$reltype" $*
+	--prefix="$prefix" --libdir="$prefix""lib/$reltype" \
+	--with-zlib="$stage/packages$prefix$reltype" --with-ssl="$stage/packages$prefix$reltype" $*
     check_damage "$AUTOBUILD_PLATFORM"
     pushd lib
     make -j 8
@@ -252,7 +252,7 @@ pushd "$CURL_SOURCE_DIR"
 
             # Force libz and openssl static linkage by moving .dylibs out of the way
             trap restore_dylibs EXIT
-            for dylib in "$stage"/packages/libraries/$host/lib/{debug,release}/lib{z,crypto,ssl}*.dylib; do
+            for dylib in "$stage"/packages/lib/{debug,release}/lib{z,crypto,ssl}*.dylib; do
                 if [ -f "$dylib" ]; then
                     mv "$dylib" "$dylib".disable
                 fi
@@ -267,7 +267,7 @@ pushd "$CURL_SOURCE_DIR"
 	    # the 32bit zlib package is unfortunately static.
             # Force static linkage to libz and openssl by moving .sos out of the way
             trap restore_sos EXIT
-            for solib in "${stage}"/packages/libraries/$host/lib/{debug,release}/lib{z,ssl,crypto}.so*; do
+            for solib in "${stage}"/packages/lib/{debug,release}/lib{z,ssl,crypto}.so*; do
                 if [ -f "$solib" ]; then
                     mv -f "$solib" "$solib".disable
                 fi
@@ -294,5 +294,7 @@ popd
 
 mkdir -p "$stage"/docs/curl/
 
-pass
+# Create version file.
+echo "pipelinefix-e4b691e8" > "$stage/version.txt"
 
+pass
