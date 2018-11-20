@@ -46,9 +46,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2a50dcb704f6af595fff44defc4b65df</string>
+              <string>0e13b23030c2e4053ba0e6cb100b151b</string>
               <key>url</key>
-              <string>http://depot.alchemyviewer.org/pub/linux64/lib-trusty/openssl-1.0.2g-linux64-201603240821.tar.bz2</string>
+              <string>https://github.com/AlericInglewood/3p-openssl/releases/download/linux64-201811201425/openssl-1.1.1-linux64-201811201425.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -124,9 +124,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1eaee9888043648d5f09716b771dcb4b</string>
+              <string>a11a8de934a96eede6fadc6e1639efb6</string>
               <key>url</key>
-              <string>http://depot.alchemyviewer.org/pub/linux64/lib-trusty/zlib-1.2.8-linux64-201603240746.tar.bz2</string>
+              <string>http://depot.alchemyviewer.org/pub/linux64/lib-xenial/zlib-1.2.11-linux64-201703120446.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -315,7 +315,7 @@
       <key>source_type</key>
       <string>hg</string>
       <key>version_file</key>
-      <string>version.txt</string>
+      <string>package_version</string>
     </map>
     <key>type</key>
     <string>autobuild</string>

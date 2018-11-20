@@ -117,9 +117,8 @@ check_damage ()
 	    echo "Verifying zlib was found"
 	    egrep 'HAVE_ZLIB_H[[:space:]]+1' lib/curl_config.h
 	    echo "Verifying openssl was found"
-	    egrep 'USE_SSLEAY[[:space:]]+1' lib/curl_config.h
-	    egrep 'USE_OPENSSL[[:space:]]+1' lib/curl_config.h
-	    egrep 'HAVE_OPENSSL_ENGINE_H[[:space:]]+1' lib/curl_config.h
+	    egrep 'USE_GNUTLS[[:space:]]+1' lib/curl_config.h
+	    egrep 'USE_TLS_SRP[[:space:]]+1' lib/curl_config.h
         ;;
     esac
 }
@@ -139,7 +138,7 @@ build_unix()
 	./configure --disable-ldap --disable-ldaps --disable-curldebug \
         --enable-threaded-resolver --without-libssh2 \
 	--prefix="$prefix" --libdir="$prefix""lib/$reltype" \
-	--with-zlib="$stage/packages$prefix$reltype" --with-ssl="$stage/packages$prefix$reltype" $*
+	--with-zlib="$stage/packages$prefix$reltype" --with-gnutls="$stage/packages$prefix$reltype" $*
     check_damage "$AUTOBUILD_PLATFORM"
     pushd lib
     make -j 8
@@ -295,6 +294,6 @@ popd
 mkdir -p "$stage"/docs/curl/
 
 # Create version file.
-echo "pipelinefix-e4b691e8" > "$stage/version.txt"
+echo "pipelinefix-e4b691e8" > "$stage/package_version"
 
 pass
